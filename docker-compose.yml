@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+  seeder:
+    build:
+      context: ./Seeder
+    container_name: seeder
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/SushiDataBase
+    command: ["node", "seeder.js"]
+    networks:
+      - app-network
+
+  server:
+    build:
+      context: ./Server
+    container_name: server
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/SushiDataBase
+    depends_on:
+      - seeder
+    networks:
+      - app-network
+
+  client:
+    build:
+      context: ./Client
+    container_name: client
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
