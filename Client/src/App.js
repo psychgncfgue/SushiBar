@@ -9,6 +9,7 @@ import Cookies from 'js-cookie';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 import PrivateRoute from './components/PrivateRoute';
+import ResetPassword from './components/ResetPassword';
 
 function App() {
   const [cart, setCart] = useState(() => {
@@ -128,6 +129,7 @@ function App() {
             path="/admindashboard"
             element={<PrivateRoute element={AdminDashboard} />}
           />
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Routes>
       </div>
     </Router>

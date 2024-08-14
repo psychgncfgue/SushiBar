@@ -1,20 +1,43 @@
 const express = require('express');
+const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-require('dotenv').config(); 
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const SECRET_KEY = process.env.SECRET_KEY || 'your_jwt_secret';
 
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+async function sendMail(to, subject, text) {
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to,
+      subject,
+      text,
+    });
+  } catch (error) {
+    console.error('Ошибка при отправке почты:', error);
+    throw new Error('Ошибка при отправке почты');
+  }
+}
+
 app.use(cors());
 app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, '../Client/public/images')));
 
-mongoose.connect('mongodb://mongodb:27017/SushiDataBase')
+mongoose.connect('mongodb://localhost:27017/SushiDataBase')
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
@@ -42,11 +65,62 @@ const User = mongoose.model('User', userSchema);
 
 const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
-  password: { type: String, required: true }
+  password: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  resetToken: { type: String, default: null },
 });
 
 const Admin = mongoose.model('Admin', adminSchema);
 
+app.post('/api/admin/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  
+  try {
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(404).json({ message: 'Админ с таким email не найден' });
+    }
+
+    const resetToken = jwt.sign({ id: admin._id }, SECRET_KEY, { expiresIn: '1h' });
+    const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
+
+    await sendMail(
+      admin.email,
+      'Сброс пароля',
+      `Нажмите на ссылку для сброса пароля: ${resetLink}`
+    );
+
+    admin.resetToken = resetToken;
+    await admin.save();
+
+    res.json({ message: 'Ссылка для сброса пароля отправлена на ваш email' });
+  } catch (error) {
+    console.error('Ошибка при обработке запроса:', error);
+    res.status(500).json({ message: 'Ошибка при отправке ссылки для сброса пароля' });
+  }
+});
+
+app.post('/api/admin/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const admin = await Admin.findById(decoded.id);
+
+    if (!admin || admin.resetToken !== token) {
+      return res.status(400).json({ message: 'Неверный токен или срок действия истек' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    admin.password = hashedPassword;
+    admin.resetToken = null;
+    await admin.save();
+
+    res.json({ message: 'Пароль успешно изменен' });
+  } catch (error) {
+    res.status(400).json({ message: 'Ошибка при сбросе пароля' });
+  }
+});
 
 app.post('/api/adminlogin', async (req, res) => {
   const { username, password } = req.body;

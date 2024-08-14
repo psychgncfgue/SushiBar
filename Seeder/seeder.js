@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-mongoose.connect('mongodb://mongodb:27017/SushiDataBase')
+mongoose.connect('mongodb://localhost:27017/SushiDataBase') // mongodb://mongodb:27017/SushiDataBase
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
@@ -25,7 +25,8 @@ const userSchema = new mongoose.Schema({
 
 const adminSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
-    password: { type: String, required: true }
+    password: { type: String, required: true },
+    email: { type: String, required: true, unique: true }
 });
 
 adminSchema.pre('save', async function(next) {
@@ -91,7 +92,8 @@ const seedDB = async () => {
 
         await Admin.create({
             username: 'admin',
-            password: 'qqq'
+            password: 'qqq',
+            email: 'telupastanislav@gmail.com'
         });
 
         console.log('Database seeded!');
